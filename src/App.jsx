@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Phone, PhoneOff, Shield, Printer, Clock, Terminal, Users, FileText,
   CheckCircle, XCircle, AlertTriangle, Lock, ChevronRight, RotateCcw,
-  Wifi, WifiOff, RefreshCw, Star, Activity,
+  Wifi, WifiOff, RefreshCw, Star, Activity, Monitor, Cpu,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -44,6 +44,57 @@ const TERMINAL_OUTPUTS = {
     '    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)',
     '    Approximate round trip times in milli-seconds:',
     '        Minimum = 1ms, Maximum = 2ms, Average = 1ms',
+  ],
+  memory_diag: [
+    '> mdsched.exe /run',
+    '',
+    'Windows Memory Diagnostic Tool',
+    'Scanning installed memory: 16384 MB',
+    '',
+    'Pass 1/2: Extended test...',
+    '......................................',
+    'ERROR: Faulty sector detected at address 0x7F3A2100',
+    'ERROR: 3 additional errors found in extended scan',
+    '',
+    'Pass 2/2: Standard test...',
+    'ERROR: Memory test FAILED',
+    '',
+    '>>> DIAGNOSIS: Replace or reseat RAM module(s) <<<',
+  ],
+  dhcp_renew: [
+    '> ipconfig /release',
+    '',
+    'Windows IP Configuration',
+    'Successfully released IP for adapter "Ethernet"',
+    '',
+    '> ipconfig /renew',
+    '',
+    'Windows IP Configuration',
+    '',
+    'Ethernet adapter:',
+    '   IPv4 Address . . . . : 10.0.2.147',
+    '   Subnet Mask . . . . : 255.255.255.0',
+    '   Default Gateway . . : 10.0.2.1',
+    '   DHCP Server . . . . : 10.0.1.1',
+    '   Lease Obtained. . . : Today 08:28:14',
+    '   Lease Expires . . . : Tomorrow 08:28:14',
+    '',
+    '>>> DHCP lease renewed successfully <<<',
+  ],
+  thermal_check: [
+    '> HWiNFO64.exe /report thermal',
+    '',
+    '=== Thermal Diagnostic Report ===',
+    'CPU: Intel Core i7-1165G7',
+    '',
+    'Current Temp:     97°C  [!!! CRITICAL — THROTTLING ACTIVE !!!]',
+    'Max Recorded:    101°C  [SHUTDOWN THRESHOLD EXCEEDED]',
+    'Fan Speed:       4,800 RPM (100% duty cycle)',
+    'Fan Status:      OBSTRUCTION DETECTED — airflow restricted',
+    'Thermal Compound: Age >18 months [REPLACEMENT RECOMMENDED]',
+    'GPU Temp:         89°C  [WARNING]',
+    '',
+    '>>> Immediate cleaning and thermal repaste required <<<',
   ],
 }
 
@@ -326,6 +377,517 @@ const SCENARIOS = {
       },
     },
   },
+
+  3: {
+    id: 3,
+    title: 'The Blue Screen of Death',
+    description: "An operations manager's PC is stuck in a BSOD loop with a critical deadline today.",
+    icon: 'monitor',
+    caller: {
+      name: 'Marcus Webb',
+      department: 'Operations',
+      role: 'Operations Manager',
+      tier: 'Standard',
+      assetTag: 'WS-0771',
+    },
+    initialPatience: 85,
+    idealTicket: {
+      category: 'Hardware',
+      priority: 'High',
+      noteKeywords: ['memory', 'ram', 'bsod', 'stop code', 'memory_management'],
+    },
+    adUsers: [
+      { id: 'mwebb',  name: 'Marcus Webb',  dept: 'Operations', status: 'active' },
+      { id: 'tlee',   name: 'Tina Lee',     dept: 'IT',         status: 'active' },
+      { id: 'cjones', name: 'Carl Jones',   dept: 'Operations', status: 'active' },
+      { id: 'nross',  name: 'Nancy Ross',   dept: 'HR',         status: 'active' },
+    ],
+    nodes: {
+      start: {
+        id: 'start',
+        speaker: 'caller',
+        text: "My computer keeps crashing with a blue screen. It's happened three times this morning. I have a project deadline in two hours and I can't afford to lose any more time.",
+        choices: [
+          {
+            label: "I can help. Can you tell me the error text on the blue screen? There's usually a stop code like MEMORY_MANAGEMENT or DRIVER_IRQL.",
+            nextNode: 'get_stop_code',
+            patienceEffect: 0,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "Just restart it again — sometimes BSODs resolve on their own.",
+            nextNode: 'get_stop_code',
+            patienceEffect: -20,
+            transcriptTag: 'dismissive',
+            penaltyNote: 'Told user to keep restarting — dismissive and unhelpful',
+          },
+          {
+            label: "That sounds like your hard drive might be failing. You may need a new PC.",
+            nextNode: 'get_stop_code',
+            patienceEffect: -15,
+            transcriptTag: 'wrong_diagnosis',
+            penaltyNote: 'Incorrect diagnosis before gathering info — patience reduced',
+          },
+        ],
+      },
+      get_stop_code: {
+        id: 'get_stop_code',
+        speaker: 'caller',
+        text: "It says... MEMORY_MANAGEMENT. And there's a sad face icon. Is that serious?",
+        choices: [
+          {
+            label: "MEMORY_MANAGEMENT points to a RAM or driver fault. I'll run Windows Memory Diagnostic right now to test your RAM — it only takes a few minutes.",
+            nextNode: 'memory_test',
+            patienceEffect: 10,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "That stop code means your hard drive is corrupt. You'll need a full Windows reinstall.",
+            nextNode: 'memory_test',
+            patienceEffect: -25,
+            transcriptTag: 'wrong_diagnosis',
+            penaltyNote: 'Wrong diagnosis — MEMORY_MANAGEMENT is a RAM/driver issue, not HDD',
+          },
+          {
+            label: "Stop codes can mean anything. Let's try a system restore first.",
+            nextNode: 'memory_test',
+            patienceEffect: -10,
+            transcriptTag: 'imprecise',
+            penaltyNote: 'Imprecise — should diagnose the specific stop code first',
+          },
+        ],
+      },
+      memory_test: {
+        id: 'memory_test',
+        speaker: 'system',
+        text: 'Action: Run Windows Memory Diagnostic (mdsched.exe) to test RAM integrity.',
+        choices: [
+          {
+            label: '[ Run Memory Diagnostic in Terminal ]',
+            nextNode: 'test_result',
+            patienceEffect: 0,
+            transcriptTag: 'action',
+            requiresTerminalAction: 'memory_diag',
+          },
+        ],
+      },
+      test_result: {
+        id: 'test_result',
+        speaker: 'caller',
+        text: "The test finished but the computer crashed again while it was running. Did the diagnostic find anything?",
+        choices: [
+          {
+            label: "Yes — the test found faulty memory sectors, which confirms a RAM failure. I'll schedule a hardware repair and set you up on a loaner machine immediately so you can hit your deadline.",
+            nextNode: 'resolution',
+            patienceEffect: 15,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "I can't see the diagnostic results remotely. You'll need to bring the machine to us.",
+            nextNode: 'resolution',
+            patienceEffect: -10,
+            transcriptTag: 'unhelpful',
+            penaltyNote: "Refused to interpret results the tech should have — patience reduced",
+          },
+        ],
+      },
+      resolution: {
+        id: 'resolution',
+        speaker: 'caller',
+        text: "A loaner? That would be great — I just need to finish this report. So it's definitely the RAM?",
+        choices: [],
+        isResolution: true,
+      },
+    },
+  },
+
+  4: {
+    id: 4,
+    title: 'No Network Connectivity',
+    description: 'A marketing employee is connected to Wi-Fi but cannot reach any websites or internal resources.',
+    icon: 'wifi',
+    caller: {
+      name: 'Priya Patel',
+      department: 'Marketing',
+      role: 'Marketing Coordinator',
+      tier: 'Standard',
+      assetTag: 'WS-2204',
+    },
+    initialPatience: 80,
+    idealTicket: {
+      category: 'Network',
+      priority: 'Medium',
+      noteKeywords: ['apipa', 'dhcp', '169.254', 'ip', 'renew'],
+    },
+    adUsers: [
+      { id: 'ppatel',  name: 'Priya Patel',  dept: 'Marketing', status: 'active' },
+      { id: 'dwilson', name: 'Dan Wilson',    dept: 'Marketing', status: 'active' },
+      { id: 'kbrown',  name: 'Karen Brown',   dept: 'IT',        status: 'active' },
+      { id: 'fmills',  name: 'Fred Mills',    dept: 'Sales',     status: 'active' },
+    ],
+    nodes: {
+      start: {
+        id: 'start',
+        speaker: 'caller',
+        text: "Hi, I can't access any websites or our company intranet. My Wi-Fi icon shows I'm connected with full bars, but absolutely nothing loads. I've been trying to fix it for 30 minutes and I have a campaign brief due this afternoon.",
+        choices: [
+          {
+            label: "Let's check your IP address first — that'll tell us a lot. Can you open Command Prompt and type 'ipconfig' and read me the IPv4 address?",
+            nextNode: 'check_ip',
+            patienceEffect: 0,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "Try restarting your router — that should fix it.",
+            nextNode: 'check_ip',
+            patienceEffect: -15,
+            transcriptTag: 'bad_advice',
+            penaltyNote: "User has no access to the router — unhelpful suggestion",
+          },
+          {
+            label: "This sounds like an ISP outage, not really an IT issue.",
+            nextNode: 'check_ip',
+            patienceEffect: -20,
+            transcriptTag: 'deflecting',
+            penaltyNote: 'Deflected without investigating — patience reduced',
+          },
+        ],
+      },
+      check_ip: {
+        id: 'check_ip',
+        speaker: 'caller',
+        text: "Okay it says... IPv4 Address: 169.254.47.83. Is that normal? It looks different from what I'm used to seeing.",
+        choices: [
+          {
+            label: "That's an APIPA address — it means your PC couldn't get a valid IP from the DHCP server. That's exactly why nothing works. I'll run ipconfig /release and /renew to force a new lease.",
+            nextNode: 'dhcp_renew',
+            patienceEffect: 15,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "That looks fine to me. Try clearing your browser cache and cookies.",
+            nextNode: 'dhcp_renew',
+            patienceEffect: -25,
+            transcriptTag: 'missed_diagnosis',
+            penaltyNote: 'Missed the APIPA address (169.254.x.x) — critical diagnostic failure',
+          },
+        ],
+      },
+      dhcp_renew: {
+        id: 'dhcp_renew',
+        speaker: 'system',
+        text: 'Action: Run ipconfig /release followed by ipconfig /renew to force a new DHCP lease.',
+        choices: [
+          {
+            label: '[ Run ipconfig /release and /renew in Terminal ]',
+            nextNode: 'check_result',
+            patienceEffect: 0,
+            transcriptTag: 'action',
+            requiresTerminalAction: 'dhcp_renew',
+          },
+        ],
+      },
+      check_result: {
+        id: 'check_result',
+        speaker: 'caller',
+        text: "Oh! The IP address changed to 10.0.2.147. Is that better? It looks more like what I usually see.",
+        choices: [
+          {
+            label: "Yes — that's a valid corporate IP from the DHCP server. Your machine is back on the network. Try opening a browser now.",
+            nextNode: 'resolution',
+            patienceEffect: 10,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "Maybe. I'm not sure what happened. Try restarting your PC to make sure it holds.",
+            nextNode: 'resolution',
+            patienceEffect: -5,
+            transcriptTag: 'uncertain',
+            penaltyNote: 'Unsure about own fix — slight patience reduction',
+          },
+        ],
+      },
+      resolution: {
+        id: 'resolution',
+        speaker: 'caller',
+        text: "It's working! I can see my emails and the intranet is loading perfectly. Thank you so much — you saved my afternoon!",
+        choices: [],
+        isResolution: true,
+      },
+    },
+  },
+
+  5: {
+    id: 5,
+    title: 'Ransomware Alert',
+    description: 'A Finance Director finds files encrypted with a ransom note. Payroll data may be at risk.',
+    icon: 'alert',
+    caller: {
+      name: 'Derek Powell',
+      department: 'Finance',
+      role: 'Finance Director',
+      tier: 'VIP',
+      assetTag: 'WS-FIN-01',
+    },
+    initialPatience: 60,
+    idealTicket: {
+      category: 'Security',
+      priority: 'Critical',
+      noteKeywords: ['ransomware', 'encrypted', 'isolated', 'backup', 'payroll', 'disabled'],
+    },
+    adUsers: [
+      { id: 'dpow',     name: 'Derek Powell', dept: 'Finance',  status: 'active' },
+      { id: 'jmorales', name: 'Jose Morales', dept: 'Finance',  status: 'active' },
+      { id: 'hkumar',   name: 'Hazel Kumar',  dept: 'IT',       status: 'active' },
+      { id: 'bsmith',   name: 'Ben Smith',    dept: 'Finance',  status: 'active' },
+    ],
+    nodes: {
+      start: {
+        id: 'start',
+        speaker: 'caller',
+        text: "I need help immediately! My screen just showed a message saying all my files are encrypted and I have to pay Bitcoin to get them back. All my files have a .LOCKED extension. I have this quarter's payroll on this machine!",
+        choices: [
+          {
+            label: "Stop — don't touch anything and do NOT pay. First priority: unplug your ethernet cable right now to isolate the machine before it spreads to network shares.",
+            nextNode: 'isolate',
+            patienceEffect: 5,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "Sometimes paying is the quickest way to get files back. How much are they asking?",
+            nextNode: 'isolate',
+            patienceEffect: -30,
+            transcriptTag: 'dangerous_advice',
+            penaltyNote: 'Never advise paying ransom — severe penalty',
+          },
+          {
+            label: "Try restarting your computer — it might just be a scary popup.",
+            nextNode: 'isolate',
+            patienceEffect: -25,
+            transcriptTag: 'dangerous_advice',
+            penaltyNote: 'Restarting can worsen ransomware damage — severe penalty',
+          },
+        ],
+      },
+      isolate: {
+        id: 'isolate',
+        speaker: 'caller',
+        text: "Cable is out. The ransom note is still on screen. Should I turn off the computer to stop it?",
+        choices: [
+          {
+            label: "Leave it powered on — shutting down destroys forensic evidence we need to investigate the attack. I'm escalating this to Critical incident status and notifying the security team now.",
+            nextNode: 'notify_security',
+            patienceEffect: 10,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "Yes, shut it down immediately to stop the encryption.",
+            nextNode: 'notify_security',
+            patienceEffect: -10,
+            transcriptTag: 'bad_advice',
+            penaltyNote: 'Shutdown destroys forensic evidence — patience reduced',
+          },
+        ],
+      },
+      notify_security: {
+        id: 'notify_security',
+        speaker: 'caller',
+        text: "What about my payroll files? We run payroll tomorrow — can they be recovered?",
+        choices: [
+          {
+            label: "Our backup system runs nightly snapshots. I'm checking with the backup team right now. First I need to disable your AD account to stop the attacker from using your credentials to pivot to other systems.",
+            nextNode: 'disable_account',
+            patienceEffect: 10,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "Those files are probably gone. You really should have had a backup strategy in place.",
+            nextNode: 'disable_account',
+            patienceEffect: -20,
+            transcriptTag: 'blame',
+            penaltyNote: 'Blamed user during a crisis — patience reduced significantly',
+          },
+        ],
+      },
+      disable_account: {
+        id: 'disable_account',
+        speaker: 'system',
+        text: "Action required: Disable Derek Powell's AD account (dpow) to prevent lateral movement with stolen credentials.",
+        choices: [
+          {
+            label: '[ Disable dpow Account in Active Directory Hub ]',
+            nextNode: 'check_backups',
+            patienceEffect: 0,
+            transcriptTag: 'action',
+            requiresADAction: { userId: 'dpow', action: 'disable' },
+          },
+        ],
+      },
+      check_backups: {
+        id: 'check_backups',
+        speaker: 'caller',
+        text: "Were the backups clean? Is payroll safe? I can't have payroll fail because of this.",
+        choices: [
+          {
+            label: "Last night's backup ran at 2 AM and is clean — before the infection window. I'm flagging it for immediate restoration and documenting everything for the incident report.",
+            nextNode: 'resolution',
+            patienceEffect: 15,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "I can't check backup status right now — we'll look into that separately.",
+            nextNode: 'resolution',
+            patienceEffect: -15,
+            transcriptTag: 'unhelpful',
+            penaltyNote: 'Deferred backup check during active incident — patience reduced',
+          },
+        ],
+      },
+      resolution: {
+        id: 'resolution',
+        speaker: 'caller',
+        text: "Thank goodness the backup is clean. Please make sure this is resolved before end of day — payroll runs tomorrow morning and I need that data.",
+        choices: [],
+        isResolution: true,
+      },
+    },
+  },
+
+  6: {
+    id: 6,
+    title: 'The Overheating Laptop',
+    description: 'A creative director\'s laptop is randomly shutting down under load with a jet-engine fan.',
+    icon: 'cpu',
+    caller: {
+      name: 'Jessica Park',
+      department: 'Creative',
+      role: 'Creative Director',
+      tier: 'Standard',
+      assetTag: 'LT-3390',
+    },
+    initialPatience: 70,
+    idealTicket: {
+      category: 'Hardware',
+      priority: 'High',
+      noteKeywords: ['overheat', 'thermal', 'cpu', 'fan', 'clean', 'cooling'],
+    },
+    adUsers: [
+      { id: 'jpark',   name: 'Jessica Park', dept: 'Creative', status: 'active' },
+      { id: 'mzang',   name: 'Mike Zang',    dept: 'Creative', status: 'active' },
+      { id: 'ltucker', name: 'Liz Tucker',   dept: 'IT',       status: 'active' },
+      { id: 'awong',   name: 'Alice Wong',   dept: 'Design',   status: 'active' },
+    ],
+    nodes: {
+      start: {
+        id: 'start',
+        speaker: 'caller',
+        text: "My laptop keeps completely shutting itself off — especially when I'm rendering video or running Photoshop. The fan is absolutely screaming. It's been happening for a week and it's getting worse. I have a client deliverable due tomorrow.",
+        choices: [
+          {
+            label: "That sounds like a thermal shutdown — the CPU overheats and the system cuts power to protect itself. When did you last have the laptop cleaned? Dust buildup in the vents is the most common cause.",
+            nextNode: 'check_age',
+            patienceEffect: 5,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "Your laptop is probably just getting old. You might need a new one.",
+            nextNode: 'check_age',
+            patienceEffect: -20,
+            transcriptTag: 'dismissive',
+            penaltyNote: 'Jumped to replacement without diagnosing — patience reduced',
+          },
+          {
+            label: "Try running fewer programs at the same time.",
+            nextNode: 'check_age',
+            patienceEffect: -10,
+            transcriptTag: 'off_topic',
+            penaltyNote: 'Thermal shutdown is a hardware issue, not a workload issue',
+          },
+        ],
+      },
+      check_age: {
+        id: 'check_age',
+        speaker: 'caller',
+        text: "I've had it about two years. I've honestly never had it cleaned — I didn't know that was something I needed to do. Could that really be causing it?",
+        choices: [
+          {
+            label: "Absolutely — two years of dust can completely block the cooling vents. I want to check the CPU temperature right now to confirm thermal throttling is happening.",
+            nextNode: 'check_temps',
+            patienceEffect: 10,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "Possibly. It's hard to say without more information.",
+            nextNode: 'check_temps',
+            patienceEffect: -5,
+            transcriptTag: 'uncertain',
+            penaltyNote: 'Vague response — tech should be more confident here',
+          },
+        ],
+      },
+      check_temps: {
+        id: 'check_temps',
+        speaker: 'system',
+        text: 'Action: Run thermal diagnostic to check CPU temperature, fan speed, and thermal compound condition.',
+        choices: [
+          {
+            label: '[ Run Thermal Diagnostic in Terminal ]',
+            nextNode: 'temp_result',
+            patienceEffect: 0,
+            transcriptTag: 'action',
+            requiresTerminalAction: 'thermal_check',
+          },
+        ],
+      },
+      temp_result: {
+        id: 'temp_result',
+        speaker: 'caller',
+        text: "Wow, 97 degrees? That sounds really high. Should I be worried? Is my laptop going to catch fire?",
+        choices: [
+          {
+            label: "97°C is critical — safe threshold is about 85°C. It won't catch fire but it will keep shutting down. I'm booking an in-house cleaning and thermal paste replacement for today, plus a loaner so you're not stuck.",
+            nextNode: 'schedule_repair',
+            patienceEffect: 15,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "It's a bit warm but probably won't cause permanent damage. Just avoid heavy applications for now.",
+            nextNode: 'schedule_repair',
+            patienceEffect: -15,
+            transcriptTag: 'bad_advice',
+            penaltyNote: '97°C is critical — minimizing a serious hardware fault',
+          },
+        ],
+      },
+      schedule_repair: {
+        id: 'schedule_repair',
+        speaker: 'caller',
+        text: "Can IT fix it or do I need to send it to the manufacturer? I absolutely cannot be without a laptop with this deadline tomorrow.",
+        choices: [
+          {
+            label: "Our technician can do the cleaning and thermal paste replacement in-house, usually same-day. I'll arrange a loaner right now so you have zero downtime.",
+            nextNode: 'resolution',
+            patienceEffect: 15,
+            transcriptTag: 'professional',
+          },
+          {
+            label: "You'll need to send it to the manufacturer — could be 2 to 3 weeks.",
+            nextNode: 'resolution',
+            patienceEffect: -10,
+            transcriptTag: 'unnecessary_escalation',
+            penaltyNote: 'Manufacturer escalation unnecessary for a cleaning — patience reduced',
+          },
+        ],
+      },
+      resolution: {
+        id: 'resolution',
+        speaker: 'caller',
+        text: "Oh a loaner, perfect! That's such a relief. Thank you for being so helpful and actually explaining what was wrong.",
+        choices: [],
+        isResolution: true,
+      },
+    },
+  },
 }
 
 // ---------------------------------------------------------------------------
@@ -391,7 +953,7 @@ function StartScreen({ onStart }) {
         <p className="mt-2 text-gray-400 text-lg">Train your IT support skills. Handle real calls. Earn your grade.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-5xl mb-8">
         {Object.values(SCENARIOS).map((scenario) => {
           const isSelected = selected === scenario.id
           return (
@@ -406,11 +968,14 @@ function StartScreen({ onStart }) {
             >
               <div className="flex items-start gap-3">
                 <div className={`p-2 rounded-lg ${isSelected ? 'bg-cyan-800/50' : 'bg-gray-800'}`}>
-                  {scenario.icon === 'printer' ? (
-                    <Printer className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />
-                  ) : (
-                    <Shield className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />
-                  )}
+                  {{
+                    printer: <Printer className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />,
+                    shield:  <Shield  className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />,
+                    monitor: <Monitor className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />,
+                    wifi:    <WifiOff className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />,
+                    alert:   <AlertTriangle className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />,
+                    cpu:     <Cpu     className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />,
+                  }[scenario.icon] ?? <Shield className={`w-5 h-5 ${isSelected ? 'text-cyan-400' : 'text-gray-400'}`} />}
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -1408,8 +1973,8 @@ export default function App() {
       },
     ])
 
-    // Scenario 2: disabling schen gives a patience bonus
-    if (action === 'disable' && userId === 'schen') {
+    // Patience bonus for key security-scenario AD actions
+    if (action === 'disable' && (userId === 'schen' || userId === 'dpow')) {
       setCallerPatience((p) => Math.min(100, p + 5))
     }
   }, [currentScenarioId])
